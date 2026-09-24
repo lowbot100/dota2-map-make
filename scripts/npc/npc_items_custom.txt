@@ -1,0 +1,62 @@
+"item_custom"  //物品名称
+{
+    //Basic Rules基础规则
+    //ItemKillable lets both allies and enemies destroy the dropped item by attacking it可杀死物品可以让盟友和敌人通过攻击来摧毁掉落的物品
+    //-----------------------------------------------------------
+    "ItemCost" "322"       //物品成本(购买时需要多少金)
+    "ItemKillable" "0"     //能否杀死的物品 , 1 - yes , 0 - no
+    "ItemSellable" "1"     //物品标签
+    "ItemPurchasable" "1"  //可购买物品
+    "ItemDroppable" "1"    //物品建议
+
+    //Stock存货
+    //If you omit the following, its behavior will be NOT_SHAREABLE如果省略以下内容，其物品将是不可共享的
+    //-----------------------------------------------------------
+    //"ItemStockMax" "1"     //最大物品库存
+    //"ItemStockTime" "100"  //物品库存时间
+    //"ItemStockInitial" "3" //物品库存初始
+
+    //Ownership所有权
+    //-----------------------------------------------------------
+    //"ItemShareability"  "ITEM_NOT_SHAREABLE"             //Rapier
+    //"ItemShareability"  "ITEM_PARTIALLY_SHAREABLE"       //Ring of Regen
+    //"ItemShareability"  "ITEM_FULLY_SHAREABLE"           //Gem宝石
+    //"ItemShareability"  "ITEM_FULLY_SHAREABLE_STACKING"  //Consumables消耗品
+
+    //Charges充电
+    //Also remember to add this somewhere, normally at the beginning of a OnSpellStart block还要记住在某个地方添加它，通常是在OnSpellStart块的开头
+    //-----------------------------------------------------------
+    "ItemInitialCharges" "1" //How many charges should the item start with - Tango x3该物品应该从多少充电开始
+    "ItemDisplayCharges" "1" //Hide the charges of the item - Aegis隐藏物品的充电
+    "ItemRequiresCharges" "1" //The active ability needs charges to be used - Urn主动能力需要充电才能使用
+
+    //Stacking, Consumable堆叠、消耗品
+    //If "ItemPermanent" is set to 1, charged items won't disappear when they hit 0 charges (Bottle, Urn, etc) By omitting it will also default to 1.
+    //如果“永久物品”被设置为1，充电物品不会因为忽略它而在击中0次充电(瓶子、瓮等等)时消失，它也将默认为1。
+    //-----------------------------------------------------------
+    "ItemStackable" "1" //物品可堆叠
+    "ItemPermanent" "0" //永久物品
+
+    //Upgradeable items可升级物品
+    //-----------------------------------------------------------
+    "MaxUpgradeLevel" "5" // Dagon - 5最高升级级别
+    "ItemBaseLevel" "1" //You'll need 5 different items, and change each accordingly你将需要5个不同的物品，并相应地改变每一个 , 物品基础级别
+
+    //Recipes配方
+    //IMPORTANT NOTE: Your item name for the recipe to be recognized by the Dota Shop UI NEEDS to have this format:"item_recipe_(name of your item)"
+    //重要提示：为了让Dota商店的界面能够识别您的物品名称，该名称必须遵循以下格式："item_recipe_(物品名称)"
+    //-----------------------------------------------------------
+    "item_recipe_custom"   //配方名称
+    {
+        "ID" "1200"
+        "BaseClass"           "item_datadriven"
+        "ItemRecipe"          "1" //destroyed after combine合并后被摧毁
+        "ItemCost"            "0" //if its 0, it will combine without needing a recipe.如果它是0，它将在不需要配方的情况下合成
+        "ItemResult"          "item_custom" //the result of combining the ItemRequirements合并ItemRequirements的结果
+        "ItemRequirements" //合成该物品需要的物品
+        {
+            "01" "item_ingredient_1;item_ingredient_2;item_ingredient_3"
+            "02" "item_ingredient_1;item_ingredient_2;item_ingredient_alternative_3"
+        }
+    }
+}
