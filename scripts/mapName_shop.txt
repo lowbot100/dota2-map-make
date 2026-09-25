@@ -1,0 +1,73 @@
+//<map_name>_shops.txt inside a scripts\shops\ folder
+
+"dota_shops"
+{
+	"consumables"  //消耗品
+	{
+
+	}
+
+	"attributes"  //属性
+	{
+
+	}
+
+	"weapons_armor"  //武器 _ 盔甲
+	{
+
+	}
+
+	"misc"  //其他，杂项
+	{
+
+	}
+
+	// Level 1 - Green Recipes  一级 - 绿色配方
+	"basics"
+	{
+
+	}
+
+	// Level 2 - Blue Recipes  二级 - 蓝色配方
+	"support"
+	{
+
+	}
+
+	"magics"
+	{
+
+	}
+
+	// Level 3 - Purple Recipes  三级 - 紫色配方
+	"defense"
+	{
+
+	}
+
+	"weapons"
+	{
+
+	}
+
+	// Level 4 - Orange / Orb / Artifacts  四级 - 橙色/球体/神器
+	"artifacts"
+	{
+
+	}
+
+	"sideshop1"
+	{
+
+	}
+
+	"sideshop2"
+	{
+
+	}
+
+	"secretshop"
+	{
+
+	}
+}
