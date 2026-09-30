@@ -91,7 +91,13 @@ function CAddonPlayerRules:InitGameMode()
     -- 自定义经验曲线参数（可调）
     self.XPBase = 250    -- 基础经验：低等级每级所需的基础经验（影响前期升级速度）。增大此值会使每一级基础需求变大。
     self.XPGrowth = 180  -- 成长系数：决定经验需求的二次项增长速度（影响后期曲线陡峭度）。增大此值会使高级别所需经验成倍上升。
-    -- 如果想替换为线性/指数/手动表，可以在 BuildCustomXPTable 中实现或直接赋 self.CustomXPTable
+
+    -- 团队共享金钱与经验（切换）
+    -- 若启用：当一名玩家获得指定的金钱/经验（例如击杀），队伍中其他在线玩家也会获得相同数量的额外金钱/经验
+    self.TeamSharedGoldXP = true
+    self.TeamShareGoldAmount = 100  -- 每次分配给队友的金钱数额
+    self.TeamShareXPAmount = 100    -- 每次分配给队友的经验数额
+    self.TeamShareExcludeKiller = true -- 是否排除击杀者本身（通常为 true）
 
     -- 游戏平衡变量（倍率类）
     self.CreepGoldMultiplier = 1.0   -- 小兵金钱倍率（其他系统可读取并应用）
@@ -172,7 +178,7 @@ function CAddonPlayerRules:InitGameMode()
     --     mode:SetAllowSameHeroSelection(self.AllowSameHero)
     -- end
 
-    -- 应用自定义英雄等级上���（如果引擎支持）
+    -- 应用自定义英雄等级上限（如果引擎支持）
     if mode.SetCustomHeroMaxLevel then
         mode:SetCustomHeroMaxLevel(self.MaxHeroLevel)
     end
@@ -224,7 +230,7 @@ function CAddonPlayerRules:InitGameMode()
 end
 
 -- OnThink 是我们周期性运行的定时器回调
--- 返回值为下一次调用的时间（秒）。返回 nil 或 -1 可以停止定时器
+-- 返回值为下一次调用的时间（秒）。返回 nil 或 -1 可以停止定��器
 function CAddonPlayerRules:OnThink()
     -- 这里放入你想要每 X 秒检查一次的逻辑，例如日志、状态检查或自动事件触发
     -- 注意：不要把耗时操作放在这里，会影响游戏性能
@@ -255,6 +261,44 @@ function CAddonPlayerRules:OnEntityKilled(event)
     local killerName = "[unknown]"
     if killer_unit ~= nil then killerName = killer_unit:GetUnitName() or tostring(killer_unit) end
     print(string.format("OnEntityKilled: killed=%s killer=%s", killedName, killerName))
+
+    -- 团队金钱/经验分配逻辑：当启用 TeamSharedGoldXP 时，被击杀单位属于敌方并且击杀者为英雄时，向队友分发固定数值的金钱和经验
+    if self.TeamSharedGoldXP and killer_unit ~= nil and killer_unit:IsRealHero() then
+        -- 确保不是自杀/队友误伤
+        local killerTeam = killer_unit:GetTeamNumber()
+        local killedTeam = killed_unit:GetTeamNumber()
+        if killedTeam ~= killerTeam then
+            local killerPlayerID = nil
+            if killer_unit.GetPlayerID then
+                killerPlayerID = killer_unit:GetPlayerID()
+            end
+
+            -- 遍历所有可能的玩家 ID（0..DOTA_MAX_PLAYERS-1），将额外的金钱和经验发放给同队且在线的英雄（可根据配置排除击杀者）
+            for playerID = 0, DOTA_MAX_PLAYERS - 1 do
+                if PlayerResource and PlayerResource:IsValidPlayerID(playerID) and PlayerResource:GetTeam(playerID) == killerTeam then
+                    -- 排除击杀者本身（如果配置为排除）
+                    if self.TeamShareExcludeKiller and playerID == killerPlayerID then
+                        -- 跳过
+                    else
+                        local allyHero = PlayerResource:GetSelectedHeroEntity(playerID)
+                        if allyHero ~= nil and allyHero:IsRealHero() then
+                            -- 发放经验
+                            if self.TeamShareXPAmount and self.TeamShareXPAmount > 0 then
+                                -- DOTA_ModifyXP_CreepKill 通常为合适的来源类型（若环境不同，请调整）
+                                allyHero:AddExperience(self.TeamShareXPAmount, DOTA_ModifyXP_CreepKill, false, true)
+                            end
+                            -- 发放金钱（非可靠金钱）
+                            if self.TeamShareGoldAmount and self.TeamShareGoldAmount > 0 then
+                                -- 修改玩家金钱：参数 (playerID, gold change, reliable, reason)
+                                PlayerResource:ModifyGold(playerID, self.TeamShareGoldAmount, false, 0)
+                            end
+                            print(string.format("TeamShare: gave player %d (%s) +%d XP +%d gold due to %s's kill", playerID, allyHero:GetUnitName(), self.TeamShareXPAmount, self.TeamShareGoldAmount, killerName))
+                        end
+                    end
+                end
+            end
+        end
+    end
 
     -- 自定义第一滴血处理（示例）：如果首次英雄杀死英雄并且我们启用了自定义处理，则记录并打印
     if not self.bFirstBloodHappened and killed_unit and killer_unit then
