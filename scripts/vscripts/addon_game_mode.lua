@@ -2,6 +2,34 @@ if CAddonPlayerRules == nil then
    CAddonPlayerRules = class({})
 end
 
+-- 自定义经验表构建函数
+-- 参数：maxLevel -> 要生成到的最大英雄等级
+-- 返回：一个 Lua table，索引为等级（从1开始），值为升级所需经验（用于 SetCustomXPRequiredToReachNextLevel）
+-- 说明：不同 Dota 2 版本对表的解释可能略有差异，常见用法是将表的第 n 项设为"从等级 n-1 升到 n 所需的经验"。
+function CAddonPlayerRules:BuildCustomXPTable(maxLevel)
+    local xpTable = {}
+    if not maxLevel or maxLevel < 1 then
+        return xpTable
+    end
+
+    -- 等级1没有经验要求（已在等级1）
+    xpTable[1] = 0
+
+    -- 下面使用一个简单的增长公式：
+    -- xpForLevel = base * (level-1) + growth * ((level-1)*(level-2)/2)
+    -- 这个公式会让每一级增长逐渐增加（近似二次增长），可以根据需要替换成任意序列或手动表
+    local base = 200
+    local growth = 100
+
+    for lvl = 2, maxLevel do
+        local n = lvl - 1
+        local xpForLevel = math.floor(base * n + growth * ((n * (n - 1)) / 2))
+        xpTable[lvl] = xpForLevel
+    end
+
+    return xpTable
+end
+
 -- Activate 在自定义游戏启动时被引导调用，创建并初始化我们的规则实例
 function Activate()
     -- 存在 GameRules 的字段中以便调试时能方便访问
@@ -105,8 +133,7 @@ function CAddonPlayerRules:InitGameMode()
         GameRules:SetPostGameTime(self.PostGameTime)
     end
 
-    -- 你可以在这里注册更多的事件监听器，例如：
-    -- 在实体被击杀、游戏状态变化、玩家连接/断开时做处理
+    -- 注册事件监听器：在实体被击杀、游戏状态变化、玩家连接/断开时做处理
     ListenToGameEvent("entity_killed", Dynamic_Wrap(self, "OnEntityKilled"), self)
     ListenToGameEvent("game_rules_state_change", Dynamic_Wrap(self, "OnGameRulesStateChange"), self)
     ListenToGameEvent("player_disconnect", Dynamic_Wrap(self, "OnPlayerDisconnect"), self)
@@ -115,6 +142,25 @@ function CAddonPlayerRules:InitGameMode()
     -- if mode.SetAllowSameHeroSelection ~= nil then
     --     mode:SetAllowSameHeroSelection(self.AllowSameHero)
     -- end
+
+    -- 应用自定义英雄等级上限（如果引擎支持）
+    if mode.SetCustomHeroMaxLevel then
+        mode:SetCustomHeroMaxLevel(self.MaxHeroLevel)
+    end
+
+    -- 构建并应用自定义经验表（如果引擎支持 SetCustomXPRequiredToReachNextLevel）
+    if mode.SetCustomXPRequiredToReachNextLevel then
+        self.CustomXPTable = self:BuildCustomXPTable(self.MaxHeroLevel)
+        -- 打印前几级经验以便调试
+        for i = 1, math.min(10, #self.CustomXPTable) do
+            -- 注意：表的键从1开始，对应等级
+            print(string.format("XP table level %d => %d", i, self.CustomXPTable[i]))
+        end
+        mode:SetCustomXPRequiredToReachNextLevel(self.CustomXPTable)
+        print("Custom XP table applied up to level " .. tostring(self.MaxHeroLevel))
+    else
+        print("Engine does not support SetCustomXPRequiredToReachNextLevel; skipping custom XP table")
+    end
 
     -- 如果你想强制设置最大英雄等级或自定义经验表，请在此实现
     -- 例如：mode:SetCustomHeroMaxLevel(self.MaxHeroLevel)
