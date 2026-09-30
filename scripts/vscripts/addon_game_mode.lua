@@ -15,13 +15,13 @@ function CAddonPlayerRules:BuildCustomXPTable(maxLevel)
     -- 等级1没有经验要求（已在等级1）
     xpTable[1] = 0
 
+    -- 从实例中读取基础参数，若未设置则使用默认值
+    local base = self.XPBase or 250
+    local growth = self.XPGrowth or 180
+
     -- 下面使用一个简单的增长公式：
     -- xpForLevel = base * (level-1) + growth * ((level-1)*(level-2)/2)
     -- 这个公式会让每一级增长逐渐增加（近似二次增长），可以根据需要替换成任意序列或手动表
-    -- 参数调整示例：下面设置为较快升级节奏（可根据需求调整）
-    local base = 250    -- 基础经验：低等级每级所需的基础经验（影响前期升级速度）。增大此值会使每一级基础需求变大。
-    local growth = 180  -- 成长系数：决定经验需求的二次项增长速度（影响后期曲线陡峭度）。增大此值会使高级别所需经验成倍上升。
-
     for lvl = 2, maxLevel do
         local n = lvl - 1
         local xpForLevel = math.floor(base * n + growth * ((n * (n - 1)) / 2))
@@ -44,6 +44,7 @@ function CAddonPlayerRules:InitGameMode()
 
     -- =====================
     -- 可调节的游戏规则（开发者可根据需要修改）
+    -- 在这里添加/修改变量即可快速调整游戏体验
     -- =====================
 
     -- 玩家队伍最大人数设置（天辉/夜魇）
@@ -87,11 +88,38 @@ function CAddonPlayerRules:InitGameMode()
     -- 最大英雄等级（若想使用自定义经验表，可在此限制等级）
     self.MaxHeroLevel = 30
 
+    -- 自定义经验曲线参数（可调）
+    self.XPBase = 250    -- 基础经验：低等级每级所需的基础经验（影响前期升级速度）。增大此值会使每一级基础需求变大。
+    self.XPGrowth = 180  -- 成长系数：决定经验需求的二次项增长速度（影响后期曲线陡峭度）。增大此值会使高级别所需经验成倍上升。
+    -- 如果想替换为线性/指数/手动表，可以在 BuildCustomXPTable 中实现或直接赋 self.CustomXPTable
+
+    -- 游戏平衡变量（倍率类）
+    self.CreepGoldMultiplier = 1.0   -- 小兵金钱倍率（其他系统可读取并应用）
+    self.CreepXPMultiplier = 1.0     -- 小兵经验倍率
+    self.TowerDamageMultiplier = 1.0  -- 防御塔伤害倍率（需在塔的脚本中使用此值进行调整）
+
+    -- Buyback（回购）相关（有些引擎方法可能不存在，仅作为配置供其他脚本使用）
+    self.EnableBuyback = true
+    self.BuybackCostPercent = 100     -- 回购消耗金钱的百分比（示例配置，具体应用需在脚本中实现）
+    self.BuybackCooldown = 300        -- 回购冷却时间（秒）
+
+    -- 中立物品/掉落相关
+    self.EnableNeutralItems = true
+    self.NeutralItemDropRate = 1.0    -- 掉率倍率，1 = 正常
+
+    -- 英雄复活/重生控制
+    self.AllowHeroRespawn = true      -- 是否允许英雄复活（若你要做无复活模式，设为 false 并在相应事件中阻止复活）
+    self.FixedRespawnTime = nil       -- 如果想设固定复活时间（秒），设为数字即可；nil 表示使用默认缩放
+
+    -- 其他可调变量（供自定义脚本读取）
+    self.EnableCustomAnnouncer = false
+    self.EnableShopSharing = false
+
     -- 内部状态：记录第一滴血是否已经发生（用于自定义处理）
     self.bFirstBloodHappened = false
 
     -- =====================
-    -- 将配置应用到 Dota2 引擎/模式实体上
+    -- 将配置应用到 Dota2 引擎/模式实体上（尽量使用存在性检查）
     -- =====================
     GameRules:SetCustomGameTeamMaxPlayers(DOTA_TEAM_GOODGUYS, self.iDesiredRadiant)
     GameRules:SetCustomGameTeamMaxPlayers(DOTA_TEAM_BADGUYS, self.iDesiredDire)
@@ -144,7 +172,7 @@ function CAddonPlayerRules:InitGameMode()
     --     mode:SetAllowSameHeroSelection(self.AllowSameHero)
     -- end
 
-    -- 应用自定义英雄等级上限（如果引擎支持）
+    -- 应用自定义英雄等级上���（如果引擎支持）
     if mode.SetCustomHeroMaxLevel then
         mode:SetCustomHeroMaxLevel(self.MaxHeroLevel)
     end
@@ -161,6 +189,28 @@ function CAddonPlayerRules:InitGameMode()
         print("Custom XP table applied up to level " .. tostring(self.MaxHeroLevel))
     else
         print("Engine does not support SetCustomXPRequiredToReachNextLevel; skipping custom XP table")
+    end
+
+    -- 尝试应用其他可用的引擎/模式设置（存在性检查）
+    if mode.SetBuybackEnabled then
+        mode:SetBuybackEnabled(self.EnableBuyback)
+    else
+        print("Mode does not support SetBuybackEnabled; set EnableBuyback is just a config value")
+    end
+
+    if mode.SetBuybackCooldown then
+        mode:SetBuybackCooldown(self.BuybackCooldown)
+    end
+
+    if mode.SetCreepGoldMultiplier then
+        mode:SetCreepGoldMultiplier(self.CreepGoldMultiplier)
+    else
+        -- 若引擎没有直接接口，你可以在小兵死亡事件中手动应用此倍率
+        print("Mode does not support SetCreepGoldMultiplier; use CreepGoldMultiplier in your creep death handler")
+    end
+
+    if mode.SetCreepXPMultiplier then
+        mode:SetCreepXPMultiplier(self.CreepXPMultiplier)
     end
 
     -- 如果你想强制设置最大英雄等级或自定义经验表，请在此实现
