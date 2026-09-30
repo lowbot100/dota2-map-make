@@ -90,28 +90,31 @@ function CAddonPlayerRules:InitGameMode()
 
     -- 自定义经验曲线参数（可调）
     self.XPBase = 250    -- 基础经验：低等级每级所需的基础经验（影响前期升级速度）。增大此值会使每一级基础需求变大。
-    self.XPGrowth = 180  -- 成长系数：决定经验需求的二次项增长速度（影响后期曲线陡峭度）。增大此值会使高级别所需经验成倍上升。
+    self.XPGrowth = 180  -- 成长系数：决定经验需求的二次项增长��度（影响后期曲线陡峭度）。增大此值会使高级别所需经验成倍上升。
 
     -- 团队共享金钱与经验（切换）
     -- 若启用：当一名玩家获得指定的金钱/经验（例如击杀），队伍中其他在线玩家也会获得相同数量的额外金钱/经验
     self.TeamSharedGoldXP = true
-    self.TeamShareGoldAmount = 100  -- 每次分配给队友的金钱数额
-    self.TeamShareXPAmount = 100    -- 每次分配给队友的经验数额
-    self.TeamShareExcludeKiller = true -- 是否排除击杀者本身（通常为 true）
+    -- TeamShareMirror = true 表示“镜像”来源玩家真实获得量：如果来源玩家一次获得 +100 金 +100 XP，队友也获得同样数值
+    -- 如果为 false，则使用下面的固定数值 TeamShareGoldAmount/TeamShareXPAmount
+    self.TeamShareMirror = true
+    self.TeamShareGoldAmount = 100  -- 当 TeamShareMirror 为 false 时，每次分配给队友的金钱数额
+    self.TeamShareXPAmount = 100    -- 当 TeamShareMirror 为 false 时，每次分配给队友的经验数额
+    self.TeamShareExcludeKiller = true -- 是否排除奖励来源玩家本身（通常为 true）
 
     -- 游戏平衡变量（倍率类）
     self.CreepGoldMultiplier = 1.0   -- 小兵金钱倍率（其他系统可读取并应用）
     self.CreepXPMultiplier = 1.0     -- 小兵经验倍率
     self.TowerDamageMultiplier = 1.0  -- 防御塔伤害倍率（需在塔的脚本中使用此值进行调整）
 
-    -- Buyback（回购）相关（有些引擎方法可能不存在，仅作为配置供其他脚本使用）
+    -- Buyback（回购）相关（有些引擎方法可能不存在，仅作���配置供其他脚本使用）
     self.EnableBuyback = true
     self.BuybackCostPercent = 100     -- 回购消耗金钱的百分比（示例配置，具体应用需在脚本中实现）
     self.BuybackCooldown = 300        -- 回购冷却时间（秒）
 
     -- 中立物品/掉落相关
     self.EnableNeutralItems = true
-    self.NeutralItemDropRate = 1.0    -- 掉率���率，1 = 正常
+    self.NeutralItemDropRate = 1.0    -- 掉率倍率，1 = 正常
 
     -- 英雄复活/重生控制
     self.AllowHeroRespawn = true      -- 是否允许英雄复活（若你要做无复活模式，设为 false 并在相应事件中阻止复活）
@@ -124,6 +127,36 @@ function CAddonPlayerRules:InitGameMode()
     -- 内部状态：记录第一滴血是否已经发生（用于自定义处理）
     self.bFirstBloodHappened = false
 
+    -- ========== 团队共享变化检测用的内部快照（用于任意奖励事件自动镜像） ==========
+    -- PlayerResource 的金钱/英雄经验会被周期性采样，对比差值以识别“谁获得了多少奖励”并进行镜像分发
+    self.PlayerGoldSnapshot = {}
+    self.PlayerXPSnapshot = {}
+    self.IgnoreGoldFor = {}  -- 用于标记刚由分享分发导致的金钱变化，下一次采样时应忽略（防止回路）
+    self.IgnoreXPFor = {}
+
+    -- 初始化快照（若尚未在 OnThink 中设置，会在首轮 OnThink 时补齐）
+    if PlayerResource then
+        for playerID = 0, DOTA_MAX_PLAYERS - 1 do
+            if PlayerResource:IsValidPlayerID(playerID) then
+                local g = 0
+                if PlayerResource.GetGold then
+                    g = PlayerResource:GetGold(playerID)
+                end
+                self.PlayerGoldSnapshot[playerID] = g
+
+                local hero = PlayerResource:GetSelectedHeroEntity(playerID)
+                if hero and hero.GetCurrentXP then
+                    self.PlayerXPSnapshot[playerID] = hero:GetCurrentXP()
+                else
+                    self.PlayerXPSnapshot[playerID] = 0
+                end
+
+                self.IgnoreGoldFor[playerID] = false
+                self.IgnoreXPFor[playerID] = false
+            end
+        end
+    end
+
     -- =====================
     -- 将配置应用到 Dota2 引擎/模式实体上（尽量使用存在性检查）
     -- =====================
@@ -132,9 +165,9 @@ function CAddonPlayerRules:InitGameMode()
 
     local mode = GameRules:GetGameModeEntity()
 
-    -- 把 OnThink 注册到游戏主循环，每隔 2 秒先进行一次全局检查
+    -- 把 OnThink 注册到游戏主循环，每隔 1 秒进行一次检查（包含共享检测）
     -- 注意：SetThink 可以接受方法名和 self（字符串方式）或直接传入函数。
-    mode:SetThink("OnThink", self, "GlobalThink", 2)
+    mode:SetThink("OnThink", self, "GlobalThink", 1)
 
     -- 设置死亡是否掉落金钱
     GameRules:GetGameModeEntity():SetLoseGoldOnDeath(self.GOLDLOSS)
@@ -220,7 +253,7 @@ function CAddonPlayerRules:InitGameMode()
     end
 
     -- 如果你想强制设置最大英雄等级或自定义经验表，请在此实现
-    -- 例如：mode:SetCustomHeroMaxLevel(self.MaxHeroLevel)
+    -- 例���：mode:SetCustomHeroMaxLevel(self.MaxHeroLevel)
 
     -- 结束初始化
     print("Game rules initialized:",
@@ -252,6 +285,9 @@ function CAddonPlayerRules:ShareTeamRewardFromPlayer(sourcePlayerID, goldAmount,
                     if goldAmount and goldAmount > 0 then
                         PlayerResource:ModifyGold(playerID, goldAmount, false, 0)
                     end
+                    -- 标记接收者在下一轮采样时忽略这次由分享导致的金钱/经验变化，防止回路或重复触发
+                    self.IgnoreGoldFor[playerID] = true
+                    self.IgnoreXPFor[playerID] = true
                     print(string.format("ShareTeamReward: player %d received +%d XP +%d gold (source player %d)", playerID, xpAmount or 0, goldAmount or 0, sourcePlayerID))
                 end
             end
@@ -274,10 +310,61 @@ function CAddonPlayerRules:OnThink()
     -- 这里放入你想要每 X 秒检查一次的逻辑，例如日志、状态检查或自动事件触发
     -- 注意：不要把耗时操作放在这里，会影响游戏性能
 
-    -- 示例：打印一次简单的心跳（仅用于调试）
-    -- print("CAddonPlayerRules:OnThink heartbeat")
+    -- 自动检测玩家金钱/经验变化并镜像（如果启用了 TeamShareMirror）
+    if self.TeamSharedGoldXP and self.TeamShareMirror and PlayerResource then
+        for playerID = 0, DOTA_MAX_PLAYERS - 1 do
+            if PlayerResource:IsValidPlayerID(playerID) then
+                -- 当前金钱
+                local currentGold = 0
+                if PlayerResource.GetGold then
+                    currentGold = PlayerResource:GetGold(playerID)
+                end
+                local lastGold = self.PlayerGoldSnapshot[playerID] or 0
+                local deltaGold = currentGold - lastGold
 
-    -- 返回 1，会在 1 秒后再次调用 OnThink。根据需要��整间隔。
+                -- 当前经验（取选中英雄的当前 XP）
+                local xp = 0
+                local hero = PlayerResource:GetSelectedHeroEntity(playerID)
+                if hero and hero.GetCurrentXP then
+                    xp = hero:GetCurrentXP()
+                end
+                local lastXP = self.PlayerXPSnapshot[playerID] or 0
+                local deltaXP = xp - lastXP
+
+                -- 如果本轮是因为分享而产生的变化，则清理标记并同步快照，不做二次分享
+                if self.IgnoreGoldFor[playerID] then
+                    self.IgnoreGoldFor[playerID] = false
+                    deltaGold = 0
+                end
+                if self.IgnoreXPFor[playerID] then
+                    self.IgnoreXPFor[playerID] = false
+                    deltaXP = 0
+                end
+
+                -- 仅在正增长时触发镜像分享（避免处理消耗或负变动）
+                local shareGold = 0
+                local shareXP = 0
+                if deltaGold > 0 then
+                    shareGold = deltaGold
+                end
+                if deltaXP > 0 then
+                    shareXP = deltaXP
+                end
+
+                -- 如果检测到来源玩家获得了奖励且数值 > 0，则把等量奖励镜像给队友（排除来源玩家本身由配置决定）
+                if (shareGold > 0 or shareXP > 0) then
+                    -- 使用通用分享函数
+                    self:ShareTeamRewardFromPlayer(playerID, shareGold, shareXP, self.TeamShareExcludeKiller)
+                end
+
+                -- 更新快照
+                self.PlayerGoldSnapshot[playerID] = currentGold
+                self.PlayerXPSnapshot[playerID] = xp
+            end
+        end
+    end
+
+    -- 返回下一次调用间隔（秒）
     return 1
 end
 
@@ -301,8 +388,8 @@ function CAddonPlayerRules:OnEntityKilled(event)
     if killer_unit ~= nil then killerName = killer_unit:GetUnitName() or tostring(killer_unit) end
     print(string.format("OnEntityKilled: killed=%s killer=%s", killedName, killerName))
 
-    -- 团队金钱/经验分配逻辑：当启用 TeamSharedGoldXP 时，被击杀单位属于敌方并且击杀者为英雄时，向队友分发固定数值的金钱和经验
-    if self.TeamSharedGoldXP and killer_unit ~= nil and killer_unit:IsRealHero() then
+    -- 团队金钱/经验分配逻辑：当��用 TeamSharedGoldXP 且非镜像模式时，使用固定数值分发（否则镜像会在 OnThink 自动处理）
+    if self.TeamSharedGoldXP and (not self.TeamShareMirror) and killer_unit ~= nil and killer_unit:IsRealHero() then
         -- 确保不是自杀/队友误伤
         local killerTeam = killer_unit:GetTeamNumber()
         local killedTeam = killed_unit:GetTeamNumber()
