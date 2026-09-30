@@ -56,17 +56,17 @@
 
 	}
 
-	"sideshop1"
+	"sideshop1"//边路商店1
 	{
 
 	}
 
-	"sideshop2"
+	"sideshop2"//边路商店2
 	{
 
 	}
 
-	"secretshop"
+	"secretshop"//神秘商店
 	{
 
 	}

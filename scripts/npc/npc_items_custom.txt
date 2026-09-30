@@ -1,62 +1,153 @@
-"item_custom"  //物品名称
+// ============================================================
+// npc_items_custom.txt —— Dota 2 自定义物品数据文件
+// 路径：game/dota_addons/<地图名>/scripts/npc/npc_items_custom.txt
+// 格式：Valve KeyValues
+// 注释规则：行内 // 之前必须留至少一个空格
+// 布尔类字段统一填 0 / 1
+// 未写出的字段自动继承 base 块的默认值
+// ============================================================
+
+"DOTAAbilities"
 {
-    //Basic Rules基础规则
-    //ItemKillable lets both allies and enemies destroy the dropped item by attacking it可杀死物品可以让盟友和敌人通过攻击来摧毁掉落的物品
-    //-----------------------------------------------------------
-    "ItemCost" "322"       //物品成本(购买时需要多少金)
-    "ItemKillable" "0"     //能否杀死的物品 , 1 - yes , 0 - no
-    "ItemSellable" "1"     //物品标签
-    "ItemPurchasable" "1"  //可购买物品
-    "ItemDroppable" "1"    //物品建议
-
-    //Stock存货
-    //If you omit the following, its behavior will be NOT_SHAREABLE如果省略以下内容，其物品将是不可共享的
-    //-----------------------------------------------------------
-    //"ItemStockMax" "1"     //最大物品库存
-    //"ItemStockTime" "100"  //物品库存时间
-    //"ItemStockInitial" "3" //物品库存初始
-
-    //Ownership所有权
-    //-----------------------------------------------------------
-    //"ItemShareability"  "ITEM_NOT_SHAREABLE"             //Rapier
-    //"ItemShareability"  "ITEM_PARTIALLY_SHAREABLE"       //Ring of Regen
-    //"ItemShareability"  "ITEM_FULLY_SHAREABLE"           //Gem宝石
-    //"ItemShareability"  "ITEM_FULLY_SHAREABLE_STACKING"  //Consumables消耗品
-
-    //Charges充电
-    //Also remember to add this somewhere, normally at the beginning of a OnSpellStart block还要记住在某个地方添加它，通常是在OnSpellStart块的开头
-    //-----------------------------------------------------------
-    "ItemInitialCharges" "1" //How many charges should the item start with - Tango x3该物品应该从多少充电开始
-    "ItemDisplayCharges" "1" //Hide the charges of the item - Aegis隐藏物品的充电
-    "ItemRequiresCharges" "1" //The active ability needs charges to be used - Urn主动能力需要充电才能使用
-
-    //Stacking, Consumable堆叠、消耗品
-    //If "ItemPermanent" is set to 1, charged items won't disappear when they hit 0 charges (Bottle, Urn, etc) By omitting it will also default to 1.
-    //如果“永久物品”被设置为1，充电物品不会因为忽略它而在击中0次充电(瓶子、瓮等等)时消失，它也将默认为1。
-    //-----------------------------------------------------------
-    "ItemStackable" "1" //物品可堆叠
-    "ItemPermanent" "0" //永久物品
-
-    //Upgradeable items可升级物品
-    //-----------------------------------------------------------
-    "MaxUpgradeLevel" "5" // Dagon - 5最高升级级别
-    "ItemBaseLevel" "1" //You'll need 5 different items, and change each accordingly你将需要5个不同的物品，并相应地改变每一个 , 物品基础级别
-
-    //Recipes配方
-    //IMPORTANT NOTE: Your item name for the recipe to be recognized by the Dota Shop UI NEEDS to have this format:"item_recipe_(name of your item)"
-    //重要提示：为了让Dota商店的界面能够识别您的物品名称，该名称必须遵循以下格式："item_recipe_(物品名称)"
-    //-----------------------------------------------------------
-    "item_recipe_custom"   //配方名称
+    // ==========================================================
+    // 基础数据块：所有物品未覆盖的字段从这里继承
+    // ==========================================================
+    "base"
     {
-        "ID" "1200"
-        "BaseClass"           "item_datadriven"
-        "ItemRecipe"          "1" //destroyed after combine合并后被摧毁
-        "ItemCost"            "0" //if its 0, it will combine without needing a recipe.如果它是0，它将在不需要配方的情况下合成
-        "ItemResult"          "item_custom" //the result of combining the ItemRequirements合并ItemRequirements的结果
-        "ItemRequirements" //合成该物品需要的物品
+        "BaseClass"              "item_datadriven"        // item_datadriven | item_lua | item_base
+        "AbilityBehavior"        "DOTA_ABILITY_BEHAVIOR_PASSIVE"   // PASSIVE | NO_TARGET | UNIT_TARGET | POINT | IMMEDIATE | AURA | DONT_RESUME_MOVEMENT
+        "AbilityUnitTargetTeam"  "DOTA_UNIT_TARGET_TEAM_ENEMY"     // ENEMY | FRIENDLY | BOTH | CUSTOM | NONE
+        "AbilityUnitTargetType"  "DOTA_UNIT_TARGET_HERO"           // HERO | BASIC | CREEP | BUILDING | MECHANICAL | ALL
+        "AbilityUnitTargetFlags" "DOTA_UNIT_TARGET_FLAG_NONE"      // NONE | RANGED_ONLY | MELEE_ONLY | DEAD | FOW_VISIBLE | NO_INVIS | NOT_ANCIENTS
+        "SpellImmunityType"      "SPELL_IMMUNITY_ENEMIES_NO"       // ENEMIES_YES | ENEMIES_NO | ALLIES_YES | ALLIES_NO
+        "SpellDispellableType"   "SPELL_DISPELLABLE_NONE"          // NONE | YES | YES_STRONG
+        "ItemPurchasable"        "1"                               // 0 | 1，是否可在商店购买
+        "ItemSellable"           "1"                               // 0 | 1，是否可出售
+        "ItemDroppable"          "1"                               // 0 | 1，是否可丢弃
+        "ItemPermanent"          "1"                               // 0 | 1，是否永久保留（消耗品填 0）
+        "ItemInitialCharges"     "0"                               // 初始充能层数
+        "ItemStackable"          "0"                               // 0 | 1，是否可堆叠
+        "ItemDisassembleRule"    "DOTA_ITEM_DISASSEMBLE_ALWAYS"    // ALWAYS | NEVER | OWNED_BY_ANY_NON_HERO //物品能否分解
+    }
+
+    // ==========================================================
+    // 示例物品：属性装备（+力量 / +护甲）
+    // 复制本段改名即可新增物品
+    // ==========================================================
+    "item_custom_warblade"
+    {
+        // ---------- 基类与行为 ----------
+        "BaseClass"              "item_datadriven"        // item_datadriven | item_lua
+        "AbilityBehavior"        "DOTA_ABILITY_BEHAVIOR_PASSIVE"   // PASSIVE = 装备即生效的被动
+        "AbilityTextureName"     "custom_warblade"        // 图标文件名，不含扩展名
+
+        // ---------- 购买与合成 ----------
+        "ItemCost"               "2200"                   // 售价（金币）
+        "ItemPurchasable"        "1"                      // 0 | 1
+        "ItemSellable"           "1"                      // 0 | 1
+        "ItemDroppable"          "1"                      // 0 | 1
+        "ItemPermanent"          "1"                      // 0 | 1
+        "ItemQuality"            "rare"                   // component组件 | common普通 | rare稀有 | epic史诗 | artifact艺术品 | secret_shop神秘商店 | consumable消耗品
+        "ItemAliases"            "warblade;wb"            // 商店搜索别名，分号分隔
+        "ItemShopTags"           "damage;strength"        // 商店分类标签，分号分隔
+        "ItemDeclarations"       "DOTA_ITEM_DECLARATION_USE"   // 声明用途，可省略
+
+        // ---------- 合成配方（可选） ----------
+        "ItemRecipe"             "1"                      // 1 = 本物品是配方产物
+        "ItemResult"             "item_custom_warblade"   // 合成结果
+        "ItemRequirements"
         {
-            "01" "item_ingredient_1;item_ingredient_2;item_ingredient_3"
-            "02" "item_ingredient_1;item_ingredient_2;item_ingredient_alternative_3"
+            "01"                 "item_ogre_axe;item_chainmail"   // 所需材料，分号分隔
+        }
+
+        // ---------- 装备即生效的属性（Modifiers） ----------
+        "Modifiers"
+        {
+            "modifier_item_custom_warblade"
+            {
+                "Passive"        "1"                      // 0 | 1，是否被动
+                "IsHidden"       "1"                      // 0 | 1，是否在状态栏隐藏
+                "Attributes"
+                {
+                    "MODIFIER_ATTRIBUTE_MULTIPLE"  "1"    // 允许同件物品叠加
+                }
+                "Properties"
+                {
+                    "MODIFIER_PROPERTY_STATS_STRENGTH_BONUS"     "15"   // 力量加成
+                    "MODIFIER_PROPERTY_PHYSICAL_ARMOR_BONUS"     "5"    // 护甲加成
+                    "MODIFIER_PROPERTY_PREATTACK_BONUS_DAMAGE"   "20"   // 攻击力加成
+                }
+            }
+        }
+    }
+
+    // ==========================================================
+    // 示例物品：主动使用（单体伤害 + 减速）
+    // ==========================================================
+    "item_custom_frost_shard"
+    {
+        "BaseClass"              "item_datadriven"        // item_datadriven | item_lua
+        "AbilityBehavior"        "DOTA_ABILITY_BEHAVIOR_UNIT_TARGET"   // UNIT_TARGET = 需选中目标
+        "AbilityUnitTargetTeam"  "DOTA_UNIT_TARGET_TEAM_ENEMY"          // ENEMY | FRIENDLY | BOTH
+        "AbilityUnitTargetType"  "DOTA_UNIT_TARGET_HERO | DOTA_UNIT_TARGET_BASIC"   // 用 | 组合
+        "AbilityUnitTargetFlags" "DOTA_UNIT_TARGET_FLAG_NONE"           // NONE | RANGED_ONLY | MELEE_ONLY
+        "AbilityTextureName"     "custom_frost_shard"     // 图标文件名
+
+        "ItemCost"               "1500"                   // 售价（金币）
+        "ItemPurchasable"        "1"                      // 0 | 1
+        "ItemSellable"           "1"                      // 0 | 1
+        "ItemDroppable"          "1"                      // 0 | 1
+        "ItemPermanent"          "1"                      // 0 | 1
+        "ItemQuality"            "rare"                   // component | common | rare | epic | artifact
+        "ItemAliases"            "frost;fs"               // 商店搜索别名
+        "ItemShopTags"           "damage;slow"            // 商店分类标签
+
+        "AbilityCooldown"        "12.0"                   // 冷却秒数
+        "AbilityManaCost"        "50"                     // 耗蓝
+        "AbilityCastRange"       "600"                    // 施法距离
+        "AbilityCastPoint"       "0.0"                    // 施法前摇，物品通常为 0
+
+        // ---------- 使用时的逻辑 ----------
+        "OnSpellStart"
+        {
+            "DamageTarget"
+            {
+                "Target"         "TARGET"                 // TARGET | POINT | CASTER | ATTACKER
+                "Damage"         "200"                    // 伤害数值
+                "DamageType"     "DAMAGE_TYPE_MAGICAL"    // MAGICAL | PHYSICAL | PURE
+            }
+            "ApplyModifier"
+            {
+                "Target"         "TARGET"
+                "ModifierName"   "modifier_item_custom_frost_shard_slow"
+                "Duration"       "3.0"                    // 持续时间（秒）
+            }
+        }
+
+        // ---------- 附加状态与属性 ----------
+        "Modifiers"
+        {
+            "modifier_item_custom_frost_shard_slow"
+            {
+                "Duration"       "3.0"                    // 持续时间（秒）
+                "IsDebuff"       "1"                      // 0 | 1，是否负面状态
+                "IsHidden"       "1"                      // 0 | 1
+                "EffectName"     "particles/units/heroes/hero_crystalmaiden/crystal_maiden_frostbite.vpcf"   // 特效路径
+                "EffectAttachType" "follow_origin"        // follow_origin | start_at_customorigin | follow_overhead
+                "Properties"
+                {
+                    "MODIFIER_PROPERTY_MOVESPEED_BONUS_PERCENTAGE"  "-25"   // 移速百分比，负数为减速
+                }
+            }
+            "modifier_item_custom_frost_shard_passive"
+            {
+                "Passive"        "1"                      // 0 | 1，装备即生效的被动
+                "IsHidden"       "1"                      // 0 | 1
+                "Properties"
+                {
+                    "MODIFIER_PROPERTY_STATS_INTELLECT_BONUS"  "10"   // 智力加成
+                }
+            }
         }
     }
 }
