@@ -18,8 +18,9 @@ function CAddonPlayerRules:BuildCustomXPTable(maxLevel)
     -- 下面使用一个简单的增长公式：
     -- xpForLevel = base * (level-1) + growth * ((level-1)*(level-2)/2)
     -- 这个公式会让每一级增长逐渐增加（近似二次增长），可以根据需要替换成任意序列或手动表
-    local base = 200
-    local growth = 100
+    -- 参数调整示例：下面设置为较快升级节奏（可根据需求调整）
+    local base = 250    -- 基础经验：低等级每级所需的基础经验（影响前期升级速度）。增大此值会使每一级基础需求变大。
+    local growth = 180  -- 成长系数：决定经验需求的二次项增长速度（影响后期曲线陡峭度）。增大此值会使高级别所需经验成倍上升。
 
     for lvl = 2, maxLevel do
         local n = lvl - 1
