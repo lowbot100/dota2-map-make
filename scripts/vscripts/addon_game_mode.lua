@@ -90,24 +90,27 @@ function CAddonPlayerRules:InitGameMode()
 
     -- 自定义经验曲线参数（可调）
     self.XPBase = 250    -- 基础经验：低等级每级所需的基础经验（影响前期升级速度）。增大此值会使每一级基础需求变大。
-    self.XPGrowth = 180  -- 成长系数：决定经验需求的二次项增长��度（影响后期曲线陡峭度）。增大此值会使高级别所需经验成倍上升。
+    self.XPGrowth = 180  -- 成长系数：决定经验需求的二次项增长速度（影响后期曲线陡峭度）。增大此值会使高级别所需经验成倍上升。
 
     -- 团队共享金钱与经验（切换）
-    -- 若启用：当一名玩家获得指定的金钱/经验（例如击杀），队伍中其他在线玩家也会获得相同数量的额外金钱/经验
+    -- 若启用：当一名玩家获得金钱/经验，队伍中其他在线玩家也会按模式获得对应的共享奖励
     self.TeamSharedGoldXP = true
-    -- TeamShareMirror = true 表示“镜像”来源玩家真实获得量：如果来源玩家一次获得 +100 金 +100 XP，队友也获得同样数值
-    -- 如果为 false，则使用下面的固定数值 TeamShareGoldAmount/TeamShareXPAmount
+    -- TeamShareMirror = true 表示“镜像”来源玩家真实获得量（通常用于击杀/拾取等）
     self.TeamShareMirror = true
-    self.TeamShareGoldAmount = 100  -- 当 TeamShareMirror 为 false 时，每次分配给队友的金钱数额
-    self.TeamShareXPAmount = 100    -- 当 TeamShareMirror 为 false 时，每次分配给队友的经验数额
-    self.TeamShareExcludeKiller = true -- 是否排除奖励来源玩家本身（通常为 true）
+    -- TeamShareAverage = true 表示把来源玩家获得的总额按队伍在线人数平均分摊
+    -- 若为 false，则按“每人获得相同值”的方式（旧行为）
+    self.TeamShareAverage = true
+    -- 是否使用可靠金钱发放（ModifyGold 的 reliable 参数）
+    self.TeamShareUseReliableGold = true
+    -- 是否排除奖励来源玩家本身（通常为 true）
+    self.TeamShareExcludeKiller = true
 
     -- 游戏平衡变量（倍率类）
     self.CreepGoldMultiplier = 1.0   -- 小兵金钱倍率（其他系统可读取并应用）
     self.CreepXPMultiplier = 1.0     -- 小兵经验倍率
     self.TowerDamageMultiplier = 1.0  -- 防御塔伤害倍率（需在塔的脚本中使用此值进行调整）
 
-    -- Buyback（回购）相关（有些引擎方法可能不存在，仅作���配置供其他脚本使用）
+    -- Buyback（回购）相关（有些引擎方法可能不存在，仅作为配置供其他脚本使用）
     self.EnableBuyback = true
     self.BuybackCostPercent = 100     -- 回购消耗金钱的百分比（示例配置，具体应用需在脚本中实现）
     self.BuybackCooldown = 300        -- 回购冷却时间（秒）
@@ -253,7 +256,7 @@ function CAddonPlayerRules:InitGameMode()
     end
 
     -- 如果你想强制设置最大英雄等级或自定义经验表，请在此实现
-    -- 例���：mode:SetCustomHeroMaxLevel(self.MaxHeroLevel)
+    -- 例如：mode:SetCustomHeroMaxLevel(self.MaxHeroLevel)
 
     -- 结束初始化
     print("Game rules initialized:",
@@ -264,34 +267,75 @@ end
 
 -- 通用函数：从指定玩家来源分发团队奖励（任意奖励事件可直接调用）
 -- 参数：sourcePlayerID -> 奖励来源玩家 ID
---       goldAmount -> 要给予每位队友的金钱（can be 0）
---       xpAmount -> 要给予每位队友的经验（can be 0）
+--       goldAmount -> 要给予的金钱总量或每人数量，取决于 TeamShareAverage 配置
+--       xpAmount -> 要给予的经验总量或每人数量，取决于 TeamShareAverage 配置
 --       excludeSource -> 是否排除奖励来源玩家本身（true 表示不发给来源玩家）
 function CAddonPlayerRules:ShareTeamRewardFromPlayer(sourcePlayerID, goldAmount, xpAmount, excludeSource)
     if not sourcePlayerID or not PlayerResource or not PlayerResource:IsValidPlayerID(sourcePlayerID) then return end
 
     local sourceTeam = PlayerResource:GetTeam(sourcePlayerID)
 
+    -- 收集接收者列表（符合队伍、有效玩家、真实英雄）
+    local recipients = {}
     for playerID = 0, DOTA_MAX_PLAYERS - 1 do
         if PlayerResource:IsValidPlayerID(playerID) and PlayerResource:GetTeam(playerID) == sourceTeam then
             if excludeSource and playerID == sourcePlayerID then
-                -- 跳过来源玩家
+                -- 排除来源
             else
                 local allyHero = PlayerResource:GetSelectedHeroEntity(playerID)
                 if allyHero ~= nil and allyHero:IsRealHero() then
-                    if xpAmount and xpAmount > 0 then
-                        allyHero:AddExperience(xpAmount, DOTA_ModifyXP_CreepKill, false, true)
-                    end
-                    if goldAmount and goldAmount > 0 then
-                        PlayerResource:ModifyGold(playerID, goldAmount, false, 0)
-                    end
-                    -- 标记接收者在下一轮采样时忽略这次由分享导致的金钱/经验变化，防止回路或重复触发
-                    self.IgnoreGoldFor[playerID] = true
-                    self.IgnoreXPFor[playerID] = true
-                    print(string.format("ShareTeamReward: player %d received +%d XP +%d gold (source player %d)", playerID, xpAmount or 0, goldAmount or 0, sourcePlayerID))
+                    table.insert(recipients, playerID)
                 end
             end
         end
+    end
+
+    local recipientCount = #recipients
+    if recipientCount == 0 then return end
+
+    -- 决定每位接收者应得的数额：按配置支持平均分摊或按人镜像
+    local perGold = 0
+    local perXP = 0
+    if goldAmount and goldAmount > 0 then
+        if self.TeamShareAverage then
+            perGold = math.floor(goldAmount / recipientCount)
+        else
+            -- 非平均：每人获得相同的数额（旧行为）
+            perGold = goldAmount
+        end
+    end
+    if xpAmount and xpAmount > 0 then
+        if self.TeamShareAverage then
+            perXP = math.floor(xpAmount / recipientCount)
+        else
+            perXP = xpAmount
+        end
+    end
+
+    -- 分发给每位接收者
+    for _, pid in ipairs(recipients) do
+        local allyHero = PlayerResource:GetSelectedHeroEntity(pid)
+        if allyHero ~= nil and allyHero:IsRealHero() then
+            if perXP and perXP > 0 then
+                allyHero:AddExperience(perXP, DOTA_ModifyXP_CreepKill, false, true)
+                -- 标记以便下一轮采样忽略该次 XP 增加（防止镜像回路）
+                self.IgnoreXPFor[pid] = true
+            end
+            if perGold and perGold > 0 then
+                -- 使用可靠金钱或非可靠金钱由配置决定
+                local reliable = (self.TeamShareUseReliableGold == true)
+                PlayerResource:ModifyGold(pid, perGold, reliable, 0)
+                -- 标记以便下一轮采样忽略该次金钱变化
+                self.IgnoreGoldFor[pid] = true
+            end
+            print(string.format("ShareTeamReward: gave player %d +%d XP +%d gold (mode average=%s reliable=%s)", pid, perXP or 0, perGold or 0, tostring(self.TeamShareAverage), tostring(self.TeamShareUseReliableGold)))
+        end
+    end
+
+    -- 防止来源玩家的原始增量被 OnThink 再次检测并镜像（当我们刚用镜像/分发时会产生来源玩家本地变化）
+    if PlayerResource:IsValidPlayerID(sourcePlayerID) then
+        self.IgnoreGoldFor[sourcePlayerID] = true
+        self.IgnoreXPFor[sourcePlayerID] = true
     end
 end
 
@@ -388,7 +432,39 @@ function CAddonPlayerRules:OnEntityKilled(event)
     if killer_unit ~= nil then killerName = killer_unit:GetUnitName() or tostring(killer_unit) end
     print(string.format("OnEntityKilled: killed=%s killer=%s", killedName, killerName))
 
-    -- 团队金钱/经验分配逻辑：当��用 TeamSharedGoldXP 且非镜像模式时，使用固定数值分发（否则镜像会在 OnThink 自动处理）
+    -- 立即镜像：当启用 TeamShareMirror 时，优先根据被击杀单位的原始赏金/经验直接分发给队友
+    if self.TeamSharedGoldXP and self.TeamShareMirror and killer_unit ~= nil and killer_unit:IsRealHero() then
+        local killerTeam = killer_unit:GetTeamNumber()
+        local killedTeam = killed_unit:GetTeamNumber()
+        if killedTeam ~= killerTeam then
+            local killerPlayerID = nil
+            if killer_unit.GetPlayerID then
+                killerPlayerID = killer_unit:GetPlayerID()
+            end
+
+            if killerPlayerID ~= nil then
+                local goldBounty = 0
+                if killed_unit.GetGoldBounty then
+                    goldBounty = killed_unit:GetGoldBounty()
+                end
+                local xpBounty = 0
+                if killed_unit.GetDeathXP then
+                    xpBounty = killed_unit:GetDeathXP()
+                end
+
+                if goldBounty > 0 or xpBounty > 0 then
+                    -- 直接按被击杀单位应给的金钱/经验镜像给队友（函数内会根据 TeamShareAverage 决定是否平均分配）
+                    self:ShareTeamRewardFromPlayer(killerPlayerID, goldBounty, xpBounty, self.TeamShareExcludeKiller)
+                    -- 标记来源玩家在下一次采样时忽略由本次击杀产生的本地增长，避免 OnThink 再次镜像
+                    self.IgnoreGoldFor[killerPlayerID] = true
+                    self.IgnoreXPFor[killerPlayerID] = true
+                    print(string.format("OnEntityKilled: mirrored kill bounty %d gold %d xp from player %d", goldBounty, xpBounty, killerPlayerID))
+                end
+            end
+        end
+    end
+
+    -- 团队金钱/经验分配逻辑：当启用 TeamSharedGoldXP 且非镜像模式时，使用固定数值分发（否则镜像会在 OnThink 或上面的镜像分发自动处理）
     if self.TeamSharedGoldXP and (not self.TeamShareMirror) and killer_unit ~= nil and killer_unit:IsRealHero() then
         -- 确保不是自杀/队友误伤
         local killerTeam = killer_unit:GetTeamNumber()
