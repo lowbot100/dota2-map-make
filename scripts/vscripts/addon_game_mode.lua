@@ -111,7 +111,7 @@ function CAddonPlayerRules:InitGameMode()
 
     -- 中立物品/掉落相关
     self.EnableNeutralItems = true
-    self.NeutralItemDropRate = 1.0    -- 掉率倍率，1 = 正常
+    self.NeutralItemDropRate = 1.0    -- 掉率���率，1 = 正常
 
     -- 英雄复活/重生控制
     self.AllowHeroRespawn = true      -- 是否允许英雄复活（若你要做无复活模式，设为 false 并在相应事件中阻止复活）
@@ -229,8 +229,47 @@ function CAddonPlayerRules:InitGameMode()
           "StartingGold=" .. tostring(self.StartingGold))
 end
 
+-- 通用函数：从指定玩家来源分发团队奖励（任意奖励事件可直接调用）
+-- 参数：sourcePlayerID -> 奖励来源玩家 ID
+--       goldAmount -> 要给予每位队友的金钱（can be 0）
+--       xpAmount -> 要给予每位队友的经验（can be 0）
+--       excludeSource -> 是否排除奖励来源玩家本身（true 表示不发给来源玩家）
+function CAddonPlayerRules:ShareTeamRewardFromPlayer(sourcePlayerID, goldAmount, xpAmount, excludeSource)
+    if not sourcePlayerID or not PlayerResource or not PlayerResource:IsValidPlayerID(sourcePlayerID) then return end
+
+    local sourceTeam = PlayerResource:GetTeam(sourcePlayerID)
+
+    for playerID = 0, DOTA_MAX_PLAYERS - 1 do
+        if PlayerResource:IsValidPlayerID(playerID) and PlayerResource:GetTeam(playerID) == sourceTeam then
+            if excludeSource and playerID == sourcePlayerID then
+                -- 跳过来源玩家
+            else
+                local allyHero = PlayerResource:GetSelectedHeroEntity(playerID)
+                if allyHero ~= nil and allyHero:IsRealHero() then
+                    if xpAmount and xpAmount > 0 then
+                        allyHero:AddExperience(xpAmount, DOTA_ModifyXP_CreepKill, false, true)
+                    end
+                    if goldAmount and goldAmount > 0 then
+                        PlayerResource:ModifyGold(playerID, goldAmount, false, 0)
+                    end
+                    print(string.format("ShareTeamReward: player %d received +%d XP +%d gold (source player %d)", playerID, xpAmount or 0, goldAmount or 0, sourcePlayerID))
+                end
+            end
+        end
+    end
+end
+
+-- 便捷全局函数：其他脚本可以直接调用 ShareTeamReward(sourcePlayerID, gold, xp, exclude)
+function ShareTeamReward(sourcePlayerID, goldAmount, xpAmount, excludeSource)
+    if GameRules and GameRules.Addon and GameRules.Addon.ShareTeamRewardFromPlayer then
+        GameRules.Addon:ShareTeamRewardFromPlayer(sourcePlayerID, goldAmount or 0, xpAmount or 0, excludeSource == nil and true or excludeSource)
+    else
+        print("ShareTeamReward: GameRules.Addon not available")
+    end
+end
+
 -- OnThink 是我们周期性运行的定时器回调
--- 返回值为下一次调用的时间（秒）。返回 nil 或 -1 可以停止定��器
+-- 返回值为下一次调用的时间（秒）。返回 nil 或 -1 可以停止定时器
 function CAddonPlayerRules:OnThink()
     -- 这里放入你想要每 X 秒检查一次的逻辑，例如日志、状态检查或自动事件触发
     -- 注意：不要把耗时操作放在这里，会影响游戏性能
@@ -238,7 +277,7 @@ function CAddonPlayerRules:OnThink()
     -- 示例：打印一次简单的心跳（仅用于调试）
     -- print("CAddonPlayerRules:OnThink heartbeat")
 
-    -- 返回 1，会在 1 秒后再次调用 OnThink。根据需要调整间隔。
+    -- 返回 1，会在 1 秒后再次调用 OnThink。根据需要��整间隔。
     return 1
 end
 
@@ -273,29 +312,9 @@ function CAddonPlayerRules:OnEntityKilled(event)
                 killerPlayerID = killer_unit:GetPlayerID()
             end
 
-            -- 遍历所有可能的玩家 ID（0..DOTA_MAX_PLAYERS-1），将额外的金钱和经验发放给同队且在线的英雄（可根据配置排除击杀者）
-            for playerID = 0, DOTA_MAX_PLAYERS - 1 do
-                if PlayerResource and PlayerResource:IsValidPlayerID(playerID) and PlayerResource:GetTeam(playerID) == killerTeam then
-                    -- 排除击杀者本身（如果配置为排除）
-                    if self.TeamShareExcludeKiller and playerID == killerPlayerID then
-                        -- 跳过
-                    else
-                        local allyHero = PlayerResource:GetSelectedHeroEntity(playerID)
-                        if allyHero ~= nil and allyHero:IsRealHero() then
-                            -- 发放经验
-                            if self.TeamShareXPAmount and self.TeamShareXPAmount > 0 then
-                                -- DOTA_ModifyXP_CreepKill 通常为合适的来源类型（若环境不同，请调整）
-                                allyHero:AddExperience(self.TeamShareXPAmount, DOTA_ModifyXP_CreepKill, false, true)
-                            end
-                            -- 发放金钱（非可靠金钱）
-                            if self.TeamShareGoldAmount and self.TeamShareGoldAmount > 0 then
-                                -- 修改玩家金钱：参数 (playerID, gold change, reliable, reason)
-                                PlayerResource:ModifyGold(playerID, self.TeamShareGoldAmount, false, 0)
-                            end
-                            print(string.format("TeamShare: gave player %d (%s) +%d XP +%d gold due to %s's kill", playerID, allyHero:GetUnitName(), self.TeamShareXPAmount, self.TeamShareGoldAmount, killerName))
-                        end
-                    end
-                end
+            -- 使用通用分享函数分发奖励（排除击杀者由配置决定）
+            if killerPlayerID ~= nil then
+                self:ShareTeamRewardFromPlayer(killerPlayerID, self.TeamShareGoldAmount, self.TeamShareXPAmount, self.TeamShareExcludeKiller)
             end
         end
     end
