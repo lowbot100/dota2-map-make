@@ -1,0 +1,28 @@
+"lang"
+{
+    "Language" "English"
+
+    "Tokens"
+    {
+        // ==========================================================
+        // item_custom_warblade
+        // ==========================================================
+        "DOTA_Tooltip_ability_item_custom_warblade" "Warblade"
+        "DOTA_Tooltip_ability_item_custom_warblade_description" "+15 Strength\n+5 Armor\n+20 Attack Damage\n\nPassive: Warblade"
+        "DOTA_Tooltip_ability_item_custom_warblade_lore" "A heavy blade forged for warriors who refuse to yield."
+
+        // ==========================================================
+        // item_custom_frost_shard
+        // ==========================================================
+        "DOTA_Tooltip_ability_item_custom_frost_shard" "Frost Shard"
+        "DOTA_Tooltip_ability_item_custom_frost_shard_description" "Deals 200 magical damage to an enemy and slows its movement speed by 25% for 3 seconds.\n\nCooldown: 12\nMana Cost: 50"
+        "DOTA_Tooltip_ability_item_custom_frost_shard_lore" "A shard of eternal ice that chills the blood of its victim."
+
+        // ==========================================================
+        // item_custom_agility_band
+        // ==========================================================
+        "DOTA_Tooltip_ability_item_custom_agility_band" "Agility Band"
+        "DOTA_Tooltip_ability_item_custom_agility_band_description" "+18 Agility\n+15 Attack Speed\n+20 Movement Speed\n\nPassive: Agility Band"
+        "DOTA_Tooltip_ability_item_custom_agility_band_lore" "A light band that makes every movement swift and precise."
+    }
+}
