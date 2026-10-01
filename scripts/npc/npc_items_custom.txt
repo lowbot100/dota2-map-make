@@ -5,9 +5,10 @@
 // 注释规则：行内 // 之前必须留至少一个空格
 // 布尔类字段统一填 0 / 1
 // 未写出的字段自动继承 base 块的默认值
+// 注意：物品数据文件的根节点必须是 "DOTAItems"（而不是 DOTAAbilities）
 // ============================================================
 
-"DOTAAbilities"
+"DOTAItems"
 {
     // ==========================================================
     // 基础数据块：所有物品未覆盖的字段从这里继承
@@ -25,13 +26,13 @@
         "ItemSellable"           "1"                               // 0 | 1，是否可出售
         "ItemDroppable"          "1"                               // 0 | 1，是否可丢弃
         "ItemPermanent"          "1"                               // 0 | 1，是否永久保留（消耗品填 0）
-        "ItemInitialCharges"     "0"                               // 初始充能层数
+        "ItemInitialCharges"     "0"                               // 初始充能层数（消耗品可用）
         "ItemStackable"          "0"                               // 0 | 1，是否可堆叠
         "ItemDisassembleRule"    "DOTA_ITEM_DISASSEMBLE_ALWAYS"    // ALWAYS | NEVER | OWNED_BY_ANY_NON_HERO //物品能否分解
     }
 
     // ==========================================================
-    // 示例物品：属性装备（+力量 / +护甲）
+    // 示例物品：属性装备（+力量 / +护甲 / +伤害）
     // 复制本段改名即可新增物品
     // ==========================================================
     "item_custom_warblade"
@@ -53,8 +54,10 @@
         "ItemDeclarations"       "DOTA_ITEM_DECLARATION_USE"   // 声明用途，可省略
 
         // ---------- 合成配方（可选） ----------
-        "ItemRecipe"             "1"                      // 1 = 本物品是配方产物
-        "ItemResult"             "item_custom_warblade"   // 合成结果
+        // 如果这是一个配方物品（仅用于合成），可用 ItemRecipe = "1" 标记。
+        // 通常配方物品会设置 ItemResult 指向合成后的产物名称。
+        "ItemRecipe"             "1"
+        "ItemResult"             "item_custom_warblade"   // 配方合成出的最终物品
         "ItemRequirements"
         {
             "01"                 "item_ogre_axe;item_chainmail"   // 所需材料，分号分隔
@@ -86,41 +89,41 @@
     // ==========================================================
     "item_custom_frost_shard"
     {
-        "BaseClass"              "item_datadriven"        // item_datadriven | item_lua
-        "AbilityBehavior"        "DOTA_ABILITY_BEHAVIOR_UNIT_TARGET"   // UNIT_TARGET = 需选中目标
-        "AbilityUnitTargetTeam"  "DOTA_UNIT_TARGET_TEAM_ENEMY"          // ENEMY | FRIENDLY | BOTH
-        "AbilityUnitTargetType"  "DOTA_UNIT_TARGET_HERO | DOTA_UNIT_TARGET_BASIC"   // 用 | 组合
-        "AbilityUnitTargetFlags" "DOTA_UNIT_TARGET_FLAG_NONE"           // NONE | RANGED_ONLY | MELEE_ONLY
-        "AbilityTextureName"     "custom_frost_shard"     // 图标文件名
+        "BaseClass"              "item_datadriven"
+        "AbilityBehavior"        "DOTA_ABILITY_BEHAVIOR_UNIT_TARGET"
+        "AbilityUnitTargetTeam"  "DOTA_UNIT_TARGET_TEAM_ENEMY"
+        "AbilityUnitTargetType"  "DOTA_UNIT_TARGET_HERO | DOTA_UNIT_TARGET_BASIC"
+        "AbilityUnitTargetFlags" "DOTA_UNIT_TARGET_FLAG_NONE"
+        "AbilityTextureName"     "custom_frost_shard"
 
-        "ItemCost"               "1500"                   // 售价（金币）
-        "ItemPurchasable"        "1"                      // 0 | 1
-        "ItemSellable"           "1"                      // 0 | 1
-        "ItemDroppable"          "1"                      // 0 | 1
-        "ItemPermanent"          "1"                      // 0 | 1
-        "ItemQuality"            "rare"                   // component | common | rare | epic | artifact
-        "ItemAliases"            "frost;fs"               // 商店搜索别名
-        "ItemShopTags"           "damage;slow"            // 商店分类标签
+        "ItemCost"               "1500"
+        "ItemPurchasable"        "1"
+        "ItemSellable"           "1"
+        "ItemDroppable"          "1"
+        "ItemPermanent"          "1"
+        "ItemQuality"            "rare"
+        "ItemAliases"            "frost;fs"
+        "ItemShopTags"           "damage;slow"
 
-        "AbilityCooldown"        "12.0"                   // 冷却秒数
-        "AbilityManaCost"        "50"                     // 耗蓝
-        "AbilityCastRange"       "600"                    // 施法距离
-        "AbilityCastPoint"       "0.0"                    // 施法前摇，物品通常为 0
+        "AbilityCooldown"        "12.0"
+        "AbilityManaCost"        "50"
+        "AbilityCastRange"       "600"
+        "AbilityCastPoint"       "0.0"
 
         // ---------- 使用时的逻辑 ----------
         "OnSpellStart"
         {
             "DamageTarget"
             {
-                "Target"         "TARGET"                 // TARGET | POINT | CASTER | ATTACKER
-                "Damage"         "200"                    // 伤害数值
-                "DamageType"     "DAMAGE_TYPE_MAGICAL"    // MAGICAL | PHYSICAL | PURE
+                "Target"         "TARGET"
+                "Damage"         "200"
+                "DamageType"     "DAMAGE_TYPE_MAGICAL"
             }
             "ApplyModifier"
             {
                 "Target"         "TARGET"
                 "ModifierName"   "modifier_item_custom_frost_shard_slow"
-                "Duration"       "3.0"                    // 持续时间（秒）
+                "Duration"       "3.0"
             }
         }
 
@@ -129,23 +132,62 @@
         {
             "modifier_item_custom_frost_shard_slow"
             {
-                "Duration"       "3.0"                    // 持续时间（秒）
-                "IsDebuff"       "1"                      // 0 | 1，是否负面状态
-                "IsHidden"       "1"                      // 0 | 1
-                "EffectName"     "particles/units/heroes/hero_crystalmaiden/crystal_maiden_frostbite.vpcf"   // 特效路径
-                "EffectAttachType" "follow_origin"        // follow_origin | start_at_customorigin | follow_overhead
+                "Duration"       "3.0"
+                "IsDebuff"       "1"
+                "IsHidden"       "1"
+                "EffectName"     "particles/units/heroes/hero_crystalmaiden/crystal_maiden_frostbite.vpcf"
+                "EffectAttachType" "follow_origin"
                 "Properties"
                 {
-                    "MODIFIER_PROPERTY_MOVESPEED_BONUS_PERCENTAGE"  "-25"   // 移速百分比，负数为减速
+                    "MODIFIER_PROPERTY_MOVESPEED_BONUS_PERCENTAGE"  "-25"
                 }
             }
             "modifier_item_custom_frost_shard_passive"
             {
-                "Passive"        "1"                      // 0 | 1，装备即生效的被动
-                "IsHidden"       "1"                      // 0 | 1
+                "Passive"        "1"
+                "IsHidden"       "1"
                 "Properties"
                 {
-                    "MODIFIER_PROPERTY_STATS_INTELLECT_BONUS"  "10"   // 智力加成
+                    "MODIFIER_PROPERTY_STATS_INTELLECT_BONUS"  "10"
+                }
+            }
+        }
+    }
+
+    // ==========================================================
+    // 新增示例物品：敏捷戒指（属性装备）
+    // - 展示如何添加敏捷/攻速/移速等属性
+    // ==========================================================
+    "item_custom_agility_band"
+    {
+        "BaseClass"              "item_datadriven"
+        "AbilityBehavior"        "DOTA_ABILITY_BEHAVIOR_PASSIVE"
+        "AbilityTextureName"     "custom_agility_band"
+
+        "ItemCost"               "1800"
+        "ItemPurchasable"        "1"
+        "ItemSellable"           "1"
+        "ItemDroppable"          "1"
+        "ItemPermanent"          "1"
+        "ItemQuality"            "common"
+        "ItemAliases"            "agility;ab"
+        "ItemShopTags"           "agility;attack_speed"
+
+        "Modifiers"
+        {
+            "modifier_item_custom_agility_band"
+            {
+                "Passive"        "1"
+                "IsHidden"       "1"
+                "Attributes"
+                {
+                    "MODIFIER_ATTRIBUTE_MULTIPLE"  "1"
+                }
+                "Properties"
+                {
+                    "MODIFIER_PROPERTY_STATS_AGILITY_BONUS"      "18"
+                    "MODIFIER_PROPERTY_ATTACKSPEED_BONUS_CONSTANT" "15"
+                    "MODIFIER_PROPERTY_MOVESPEED_BONUS_CONSTANT"   "20"
                 }
             }
         }
